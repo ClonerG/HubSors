@@ -1,0 +1,5 @@
+[
+  {"device_id": 10, "name": "Motion Sensor", "battery_level": 45, "is_online": true},
+  {"device_id": 11, "name": "Water Leak", "battery_level": 25, "is_online": true},
+  {"device_id": 12, "name": "Window Sensor", "battery_level": 80, "is_online": false}
+]
