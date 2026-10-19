@@ -1,1 +1,1 @@
-String from master branch
+Asynchronous hub for sensors. Includes logging and tests using Pytest. Project is under development.
