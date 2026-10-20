@@ -1,8 +1,7 @@
 import pytest
-from main import Hub, Sensor, DuplicateDeviceError, DeviceOfflineError
-import pytest_asyncio
-import pytest_mock
 import asyncio
+from main import Hub, Sensor, DuplicateDeviceError, DeviceOfflineError, APIResponseError, APITimeoutError
+
 
 @pytest.mark.asyncio
 async def test_full_check_with_mock(mocker):
@@ -11,11 +10,7 @@ async def test_full_check_with_mock(mocker):
     mock_ping.side_effect = DeviceOfflineError("Mock tells sensor is offline")
     await sensor.full_check()
     mock_ping.assert_called_once()
-@pytest.fixture
-def default_hub():
-    hub= Hub(device_id=1, name="Test Hub")
-    yield hub
-    hub.connected_sensors.clear()
+
 @pytest.mark.parametrize("bad_value", [-1, 101, 200, -500])
 def test_invalid_battery_level(bad_value, default_hub):
     wall_sensor = Sensor(device_id=15, name="Wall Sensor", battery_level=50)
@@ -36,3 +31,29 @@ async def test_offline_sensor():
 
     with pytest.raises(DeviceOfflineError):
         await roof_sensor.ping()
+
+@pytest.mark.asyncio
+async def test_fetch_firmware_version(default_hub):
+    fetch_firmware_response = await default_hub.fetch_firmware_version()
+    assert isinstance(fetch_firmware_response, dict)
+    assert "name" in fetch_firmware_response
+    assert fetch_firmware_response["id"] == 1
+
+@pytest.mark.asyncio
+async def test_fetch_firmware_error(default_hub,mocker):
+    mock_response = mocker.AsyncMock()
+    mock_response.status = 500
+
+    mock_get = mocker.patch("aiohttp.ClientSession.get")
+    mock_get.return_value.__aenter__.return_value = mock_response
+
+    with pytest.raises(APIResponseError):
+        await default_hub.fetch_firmware_version()
+
+@pytest.mark.asyncio
+async def test_fetch_firmware_timeout(default_hub,mocker):
+    mock_get = mocker.patch("aiohttp.ClientSession.get")
+    mock_get.side_effect = asyncio.TimeoutError
+
+    with pytest.raises(APITimeoutError):
+        await default_hub.fetch_firmware_version()

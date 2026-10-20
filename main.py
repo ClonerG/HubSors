@@ -1,7 +1,7 @@
 import asyncio
 import json
-
 import logging
+import aiohttp
 
 logging.basicConfig(
     level=logging.INFO, # Ловим всё, начиная с уровня INFO и выше
@@ -12,6 +12,10 @@ logging.basicConfig(
     ]
 )
 
+class APITimeoutError(Exception):
+    pass
+class APIResponseError(Exception):
+    pass
 class DeviceOfflineError(Exception):
     pass
 class DuplicateDeviceError(Exception):
@@ -89,6 +93,18 @@ class Hub(Device):
         self.connected_sensors[sensor.device_id] = sensor
         logging.info(f"Sensor {sensor.name} succesfully connected to hub {self.name}")
 
+    async def fetch_firmware_version(self):
+        timeout = aiohttp.ClientTimeout(total=2)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            try:
+                async with session.get('https://jsonplaceholder.typicode.com/users/1') as response:
+                    if response.status != 200:
+                        raise APIResponseError(f"Critical error: {response.status}")
+                    return await response.json()
+            except asyncio.TimeoutError:
+                raise APITimeoutError(f"Timeout error!")
+
+
     async def poll_sensors(self):
         logging.info(f"Hub {self.name} start sensor check")
         tasks = [sensor.full_check() for sensor in self.connected_sensors.values()]
@@ -111,6 +127,9 @@ async def main():
         main_hub.add_sensor(new_sensor)
 
     await main_hub.poll_sensors()
+    firmware_info = await main_hub.fetch_firmware_version()
+    print("Server firmware version:", firmware_info)
 
 if __name__ == "__main__":
         asyncio.run(main())
+

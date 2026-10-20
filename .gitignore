@@ -4,3 +4,4 @@ __pycache__/
 hub.log
 .venv/
 .idea/
+tests/hub.log
