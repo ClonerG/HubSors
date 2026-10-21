@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from main import Hub, Sensor, DuplicateDeviceError, DeviceOfflineError, APIResponseError, APITimeoutError
-
+from models import FirmwareResponse
 
 @pytest.mark.asyncio
 async def test_full_check_with_mock(mocker):
@@ -35,9 +35,9 @@ async def test_offline_sensor():
 @pytest.mark.asyncio
 async def test_fetch_firmware_version(default_hub):
     fetch_firmware_response = await default_hub.fetch_firmware_version()
-    assert isinstance(fetch_firmware_response, dict)
-    assert "name" in fetch_firmware_response
-    assert fetch_firmware_response["id"] == 1
+    assert isinstance(fetch_firmware_response, FirmwareResponse)
+    assert fetch_firmware_response.name is not None
+    assert fetch_firmware_response.id == 1
 
 @pytest.mark.asyncio
 async def test_fetch_firmware_error(default_hub,mocker):

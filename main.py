@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import aiohttp
+from models import FirmwareResponse
 
 logging.basicConfig(
     level=logging.INFO, # Ловим всё, начиная с уровня INFO и выше
@@ -100,7 +101,8 @@ class Hub(Device):
                 async with session.get('https://jsonplaceholder.typicode.com/users/1') as response:
                     if response.status != 200:
                         raise APIResponseError(f"Critical error: {response.status}")
-                    return await response.json()
+                    firmware_data = await response.json()
+                    return FirmwareResponse(**firmware_data)
             except asyncio.TimeoutError:
                 raise APITimeoutError(f"Timeout error!")
 

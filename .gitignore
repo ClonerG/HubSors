@@ -1,7 +1,6 @@
 # created by virtualenv automatically
 __pycache__/
 .pytest_cache/ 
-hub.log
+*.log
 .venv/
 .idea/
-tests/hub.log
