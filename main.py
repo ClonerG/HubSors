@@ -4,6 +4,39 @@ import logging
 import aiohttp
 from models import FirmwareResponse
 
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Integer, DateTime
+import datetime
+import os
+
+DB_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://admin:password@localhost:5432/sensor_db")
+engine = create_async_engine(DB_URL)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+class Base(DeclarativeBase):
+    pass
+
+class SensorHistory(Base):
+    __tablename__ = "sensor_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sensor_name: Mapped[str] = mapped_column(String(50))
+    battery_level: Mapped[int] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20))  # online/offline
+    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+async def init_db():
+    while True:
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logging.info("Database initialized")
+            break
+        except Exception:
+            logging.warning("Database is not initialized, waiting 2 seconds...")
+            await asyncio.sleep(2)
+
 logging.basicConfig(
     level=logging.INFO, # Ловим всё, начиная с уровня INFO и выше
     format="%(asctime)s - %(levelname)s - %(message)s", # Красивый формат со временем
@@ -110,9 +143,24 @@ class Hub(Device):
     async def poll_sensors(self):
         logging.info(f"Hub {self.name} start sensor check")
         tasks = [sensor.full_check() for sensor in self.connected_sensors.values()]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        async with AsyncSessionLocal() as session:
+            for sensor in self.connected_sensors.values():
+                status = "online" if sensor.is_online else "offline"
+                battery = getattr(sensor, 'battery_level', None)
+
+                record = SensorHistory(
+                    sensor_name=sensor.name,
+                    battery_level=battery,
+                    status=status
+                )
+                session.add(record)
+            await session.commit()
+        logging.info("История опроса сохранена в БД")
 
 async def main():
+    await init_db()
     main_hub = Hub(device_id=1, name="SmartHome Hub")
 
     temp_sensor = Sensor(device_id=2, name="Temperature Sensor", battery_level= 77)
@@ -128,9 +176,13 @@ async def main():
         new_sensor = Sensor(**item)
         main_hub.add_sensor(new_sensor)
 
-    await main_hub.poll_sensors()
     firmware_info = await main_hub.fetch_firmware_version()
     print("Server firmware version:", firmware_info)
+
+    while True:
+        await main_hub.poll_sensors()
+        logging.info("Опрос завершен, спим 10 секунд...")
+        await asyncio.sleep(10)
 
 if __name__ == "__main__":
         asyncio.run(main())
