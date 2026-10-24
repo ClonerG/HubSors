@@ -7,8 +7,13 @@ from models import FirmwareResponse
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Integer, DateTime
+from sqlalchemy import select
+
 import datetime
 import os
+
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://admin:password@localhost:5432/sensor_db")
 engine = create_async_engine(DB_URL)
@@ -38,11 +43,11 @@ async def init_db():
             await asyncio.sleep(2)
 
 logging.basicConfig(
-    level=logging.INFO, # Ловим всё, начиная с уровня INFO и выше
-    format="%(asctime)s - %(levelname)s - %(message)s", # Красивый формат со временем
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("hub.log", mode='a', encoding='utf-8'), # Пишем в файл
-        logging.StreamHandler() # И дублируем в консоль
+        logging.FileHandler("hub.log", mode='a', encoding='utf-8'),
+        logging.StreamHandler()
     ]
 )
 
@@ -159,7 +164,7 @@ class Hub(Device):
             await session.commit()
         logging.info("История опроса сохранена в БД")
 
-async def main():
+async def start_polling():
     await init_db()
     main_hub = Hub(device_id=1, name="SmartHome Hub")
 
@@ -184,6 +189,20 @@ async def main():
         logging.info("Опрос завершен, спим 10 секунд...")
         await asyncio.sleep(10)
 
-if __name__ == "__main__":
-        asyncio.run(main())
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    polling_task = asyncio.create_task(start_polling())
+    yield
+    polling_task.cancel()
 
+app = FastAPI(lifespan=lifespan)
+
+
+
+@app.get("/api/logs")
+async def get_logs():
+    async with AsyncSessionLocal() as session:
+        query = select(SensorHistory).order_by(SensorHistory.timestamp.desc()).limit(10)
+        result = await session.execute(query)
+        records = result.scalars().all()
+        return records

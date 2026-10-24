@@ -2,6 +2,8 @@ import pytest
 import asyncio
 from main import Hub, Sensor, DuplicateDeviceError, DeviceOfflineError, APIResponseError, APITimeoutError
 from models import FirmwareResponse
+from fastapi.testclient import TestClient
+from main import app
 
 @pytest.mark.asyncio
 async def test_full_check_with_mock(mocker):
@@ -57,3 +59,20 @@ async def test_fetch_firmware_timeout(default_hub,mocker):
 
     with pytest.raises(APITimeoutError):
         await default_hub.fetch_firmware_version()
+
+client = TestClient(app)
+
+def test_get_log(mocker):
+    mock_session_maker = mocker.patch("main.AsyncSessionLocal")
+    mock_session = mocker.AsyncMock()
+    mock_session_maker.return_value.__aenter__.return_value = mock_session
+
+    mock_result = mocker.MagicMock()
+    mock_result.scalars().all.return_value = [{"sensor_name": "Mock", "status": "online"}]
+    mock_session.execute.return_value = mock_result
+
+    response = client.get("/api/logs")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
