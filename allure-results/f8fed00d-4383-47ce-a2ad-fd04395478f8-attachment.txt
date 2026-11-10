@@ -1,0 +1,1 @@
+[32mINFO    [0m httpx2:_client.py:1084 HTTP Request: GET http://testserver/api/logs "HTTP/1.1 200 OK"

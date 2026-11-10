@@ -29,7 +29,7 @@ class SensorHistory(Base):
     sensor_name: Mapped[str] = mapped_column(String(50))
     battery_level: Mapped[int] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20))  # online/offline
-    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC).replace(tzinfo=None))
 
 async def init_db():
     while True:

@@ -4,3 +4,4 @@ __pycache__/
 *.log
 .venv/
 .idea/
+allure-2.46.1

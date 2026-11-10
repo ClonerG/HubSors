@@ -1,0 +1,1 @@
+2026-11-10 22:32:40,849 - ERROR - Mock tells sensor is offline

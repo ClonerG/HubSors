@@ -1,0 +1,1 @@
+[31m[1mERROR   [0m root:main.py:122 Mock tells sensor is offline
