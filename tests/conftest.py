@@ -6,6 +6,12 @@ from main import Hub
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+@pytest.fixture(scope="function", autouse=True)
+def event_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
 
 @pytest.fixture
 def default_hub():

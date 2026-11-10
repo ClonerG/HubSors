@@ -6,7 +6,7 @@ from models import FirmwareResponse
 from fastapi.testclient import TestClient
 from main import app
 import allure
-from main import SensorHistory,AsyncSessionLocal,engine
+from main import SensorHistory,AsyncSessionLocal,engine,init_db
 from httpx import ASGITransport
 from datetime import datetime, timedelta, UTC
 
@@ -92,6 +92,7 @@ def test_get_log(mocker):
 @pytest.mark.asyncio
 @allure.title("Integration: Реальная запись в БД и проверка API")
 async def test_get_logs_integration():
+    await init_db()
     with allure.step("Шаг 1: adding log to real DB with SQLAlchemy"):
         async with AsyncSessionLocal() as session:
             fake_log = SensorHistory(
@@ -116,6 +117,7 @@ async def test_get_logs_integration():
 @pytest.mark.asyncio
 @allure.title("Integration: Check logs limit and DESC sorting")
 async def test_get_logs_limit():
+    await init_db()
 
     with allure.step("Insert 15 logs with different timestamps"):
         async with AsyncSessionLocal() as session:
