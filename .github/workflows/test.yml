@@ -9,6 +9,21 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: sensor_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
 
     - name: Checkout code
@@ -29,3 +44,5 @@ jobs:
 
     - name: Run Pytest
       run: python -m pytest
+      env:
+        DATABASE_URL: postgresql+asyncpg://admin:password@localhost:5432/sensor_db
