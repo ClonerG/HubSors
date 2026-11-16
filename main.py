@@ -2,21 +2,24 @@ import asyncio
 import json
 import logging
 import aiohttp
+
 from models import FirmwareResponse
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 from sqlalchemy import String, Integer, DateTime
 from sqlalchemy import select
 
 import datetime
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import APIKeyHeader
 from contextlib import asynccontextmanager
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://admin:password@localhost:5432/sensor_db")
-engine = create_async_engine(DB_URL)
+engine = create_async_engine(DB_URL, poolclass=NullPool)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 class Base(DeclarativeBase):
@@ -197,9 +200,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "asdjtjassad-dsa")
+api_key_header = APIKeyHeader(name="X-API-Key")
 
+async def verify_api_key(api_key: str = Depends(api_key_header)):
+    if api_key != API_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API Key"
+        )
+    return api_key
 
-@app.get("/api/logs")
+@app.get("/api/logs",dependencies=[Depends(verify_api_key)])
 async def get_logs():
     async with AsyncSessionLocal() as session:
         query = select(SensorHistory).order_by(SensorHistory.timestamp.desc()).limit(10)

@@ -1,14 +1,17 @@
 import pytest
 import asyncio
 import httpx
-from main import Hub, Sensor, DuplicateDeviceError, DeviceOfflineError, APIResponseError, APITimeoutError
+
+
+from main import API_SECRET_KEY, Sensor, DuplicateDeviceError, DeviceOfflineError, APIResponseError, APITimeoutError
 from models import FirmwareResponse
 from fastapi.testclient import TestClient
 from main import app
 import allure
-from main import SensorHistory,AsyncSessionLocal,engine,init_db
+from main import SensorHistory,AsyncSessionLocal,init_db
 from httpx import ASGITransport
 from datetime import datetime, timedelta, UTC
+from sqlalchemy import delete
 
 @pytest.mark.asyncio
 async def test_full_check_with_mock(mocker):
@@ -80,7 +83,7 @@ def test_get_log(mocker):
         mock_session.execute.return_value = mock_result
 
     with allure.step("GET /api/logs"):
-        response = client.get("/api/logs")
+        response = client.get("/api/logs", headers={"X-API-Key": API_SECRET_KEY})
 
     with allure.step("Check status and response structure"):
         assert response.status_code == 200
@@ -95,6 +98,7 @@ async def test_get_logs_integration():
     await init_db()
     with allure.step("Шаг 1: adding log to real DB with SQLAlchemy"):
         async with AsyncSessionLocal() as session:
+            await session.execute(delete(SensorHistory))
             fake_log = SensorHistory(
                 sensor_name="Water_sensor",
                 battery_level=99,
@@ -105,14 +109,13 @@ async def test_get_logs_integration():
 
     with allure.step("Шаг 2: Check FastAPI with async client"):
         async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as ac:
-            response = await ac.get("/api/logs")
+            response = await ac.get("/api/logs", headers={"X-API-Key": API_SECRET_KEY})
 
     with allure.step("Шаг 3: check added log"):
         assert response.status_code == 200
         data = response.json()
         sensor_names = [item["sensor_name"] for item in data]
         assert "Water_sensor" in sensor_names
-    await engine.dispose()
 
 @pytest.mark.asyncio
 @allure.title("Integration: Check logs limit and DESC sorting")
@@ -121,6 +124,7 @@ async def test_get_logs_limit():
 
     with allure.step("Insert 15 logs with different timestamps"):
         async with AsyncSessionLocal() as session:
+            await session.execute(delete(SensorHistory))
             base_time = datetime.now(UTC).replace(tzinfo=None)
 
             for i in range(15):
@@ -128,14 +132,14 @@ async def test_get_logs_limit():
                     sensor_name=f"Sensor_{i}",
                     battery_level=50 + i,
                     status="online",
-                    timestamp=base_time + timedelta(minutes=i)
+                    timestamp=base_time + timedelta(days=1, minutes=i)
                 )
                 session.add(log)
             await session.commit()
 
     with allure.step("Send GET request to API"):
         async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as ac:
-            response = await ac.get("/api/logs")
+            response = await ac.get("/api/logs", headers={"X-API-Key": API_SECRET_KEY})
 
     with allure.step("Verify limit and sorting"):
         assert response.status_code == 200
@@ -144,4 +148,16 @@ async def test_get_logs_limit():
         assert len(data) == 10
         assert data[0]["sensor_name"] == "Sensor_14"
         assert data[9]["sensor_name"] == "Sensor_5"
-    await engine.dispose()
+
+@pytest.mark.asyncio
+@allure.title("Security: Access denied without or with invalid API key")
+async def test_get_logs_unauthorized():
+    async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as ac:
+        with allure.step("Request without API key"):
+            response_no_key = await ac.get("/api/logs")
+            assert response_no_key.status_code == 401
+
+        with allure.step("Request with invalid API key"):
+            response_wrong_key = await ac.get("/api/logs", headers={"X-API-Key": "wrong-secret-key"})
+            assert response_wrong_key.status_code == 403
+            assert response_wrong_key.json()["detail"] == "Invalid API Key"
