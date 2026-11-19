@@ -38,9 +38,9 @@ curl -H "X-API-Key: asdjtjassad-dsa" http://localhost:8000/api/logs
 ## Running Tests & Allure Report
 Run all tests inside the Docker container and save results for Allure:
 ```bash
-docker compose exec app pytest --alluredir=allure-results
+docker compose exec hub pytest --alluredir=allure-results
 ```
-Open the visual Allure report in your browser:
+Open the visual Allure report in your browser (requires Allure CLI):
 ```bash
 allure serve allure-results
 ```

@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 .idea/
 allure-2.46.1
+allure-results

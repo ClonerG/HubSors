@@ -1,1 +1,0 @@
-[32mINFO    [0m root:main.py:133 Sensor Floor Sensor succesfully connected to hub Test Hub
